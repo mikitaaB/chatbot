@@ -1,0 +1,78 @@
+generator client {
+  provider        = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+enum Role {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model Profile {
+  id          String   @id @db.Uuid
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  chats        Chat[]
+  messages     Message[]
+  attachments  Attachment[]
+
+  @@map("profiles")
+}
+
+model Chat {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String   @db.Uuid
+  title       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user        Profile   @relation(fields: [user_id], references: [id])
+  messages    Message[]
+
+  @@index([user_id, updated_at])
+  @@map("chats")
+}
+
+model Message {
+  id          String   @id @default(uuid()) @db.Uuid
+  chat_id     String   @db.Uuid
+  user_id     String   @db.Uuid
+  role        Role
+  content     String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  chat        Chat      @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  user        Profile   @relation(fields: [user_id], references: [id])
+  attachments Attachment[]
+
+  @@index([chat_id, created_at])
+  @@map("messages")
+}
+
+model Attachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  message_id   String   @db.Uuid
+  user_id      String   @db.Uuid
+  storage_path String
+  created_at   DateTime @default(now())
+
+  message   Message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user      Profile @relation(fields: [user_id], references: [id])
+
+  @@map("attachments")
+}
+
+model GuestSession {
+  id               String   @id @default(uuid()) @db.Uuid
+  guest_token_hash String   @unique
+  remaining_quota  Int      @default(3)
+  created_at       DateTime @default(now())
+
+  @@map("guest_sessions")
+}
