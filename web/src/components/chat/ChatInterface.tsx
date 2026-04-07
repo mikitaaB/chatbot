@@ -17,7 +17,7 @@ export function ChatInterface() {
     const { guest } = useAuth();
     const queryClient = useQueryClient();
     const { messages: serverMessages, isLoading, isError } = useChatMessages(chatId as string);
-    const { sendMessage, streamingMessage, isStreaming } = useChatStream(chatId as string);
+    const { sendMessage, streamingMessage, isStreaming, error } = useChatStream(chatId as string);
     const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
 
     const router = useRouter();
@@ -54,11 +54,14 @@ export function ChatInterface() {
 
         try {
             await sendMessage(content, pendingUploads);
-            queryClient.invalidateQueries({ queryKey: ['messages', chatId] });
-            queryClient.invalidateQueries({ queryKey: ['chats'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['messages', chatId] }),
+                queryClient.invalidateQueries({ queryKey: ['chats'] }),
+            ]);
             setOptimisticMessages([]);
-        } catch (error) {
-            console.error('Failed to send message:', error);
+        } catch (err: unknown) {
+            const errMessage = err instanceof Error ? err.message : 'Failed to send message';
+            console.error('Failed to send message:', errMessage);
             setOptimisticMessages(prev => prev.filter(m => m.id !== userMsgId));
         }
     };
@@ -85,6 +88,11 @@ export function ChatInterface() {
             {guest?.remainingQuota === 0 && <GuestQuotaAlert />}
 
             <div className="flex-1 overflow-y-auto">
+                {error && (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 p-3 rounded-md text-sm mx-4 mb-2">
+                        {error}
+                    </div>
+                )}
                 <MessageList
                     messages={allMessages}
                     isLoading={isLoading}
