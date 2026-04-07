@@ -22,9 +22,17 @@ export function ChatSidebar() {
 
     const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
         e.stopPropagation();
+
+        const remainingChats = chats?.filter(c => c.id !== chatId) ?? [];
+
         await deleteChat.mutateAsync(chatId);
         if (currentChatId === chatId) {
-            router.push('/');
+            if (remainingChats.length > 0) {
+                router.push(`/chat/${remainingChats[0].id}`);
+            } else {
+                const newChat = await createChat.mutateAsync(undefined);
+                router.push(`/chat/${newChat.id}`);
+            }
         }
     };
 
@@ -103,7 +111,10 @@ export function ChatSidebar() {
                         </span>
                     </div>
                     {user && (
-                        <Button variant="ghost" size="sm" onClick={signOut}>
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                            await signOut();
+                            router.push('/');
+                        }}>
                             <LogOut className="h-4 w-4 mr-1" />
                             Logout
                         </Button>

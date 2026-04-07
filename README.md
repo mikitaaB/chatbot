@@ -20,7 +20,7 @@ ChatGPT-like chatbot interface with Gemini LLM support, real-time streaming, ima
     npm install
 ```
 2. Set up environment variables \
-Create `.env` according to `.env.example` in the `web` directory.
+Create `.env.local` according to `.env.example` in the `web` directory.
 
 3. Start supabase locally in the root directory.
 ```bash
