@@ -52,3 +52,13 @@ Create `.env.local` according to `.env.example` in the `web` directory.
 ```
 
 The app is available on http://localhost:3000/
+
+
+## Environment variables
+**NEXT_PUBLIC_SUPABASE_URL** - Your Supabase project URL \
+**GEMINI_API_KEY** - API key for Google Gemini LLM \
+**DATABASE_URL** - Postgres connection string \
+**DIRECT_URL** - Direct database connection \
+**NEXT_PUBLIC_SUPABASE_ANON_KEY** - Supabase anonymous/public key \
+**SUPABASE_SERVICE_ROLE_KEY** - Secret admin key for Supabase \
+**NODE_ENV** - Environment mode: development, production
