@@ -11,6 +11,10 @@ ChatGPT-like chatbot interface with Gemini LLM support, real-time streaming, ima
 - **Realtime updates:** Supabase Realtime
 - **Deployment:** Vercel
 
+## Prerequisites
+
+- **Node.js**
+- **Docker**
 
 ## How to run locally
 
@@ -21,6 +25,9 @@ ChatGPT-like chatbot interface with Gemini LLM support, real-time streaming, ima
 ```
 2. Set up environment variables \
 Create `.env.local` according to `.env.example` in the `web` directory.
+```bash
+    cp .env.example .env.local
+```
 
 3. Start supabase locally in the root directory.
 ```bash
@@ -43,3 +50,5 @@ Create `.env.local` according to `.env.example` in the `web` directory.
 ```bash
     npm run dev
 ```
+
+The app is available on http://localhost:3000/
