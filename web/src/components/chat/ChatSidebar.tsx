@@ -1,5 +1,6 @@
 'use client';
 
+import { MouseEvent } from 'react';
 import { useChats, type ChatListItem } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ export function ChatSidebar() {
         router.push(`/chat/${newChat.id}`);
     };
 
-    const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
+    const handleDeleteChat = async (chatId: string, e: MouseEvent) => {
         e.stopPropagation();
 
         const remainingChats = chats?.filter(c => c.id !== chatId) ?? [];

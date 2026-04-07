@@ -6,6 +6,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, FileText, Image as ImageIcon, User } from 'lucide-react';
 import type { ChatAttachment, ChatMessage } from '@/hooks/useChatMessages';
 
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 interface MessageBubbleProps {
     message: ChatMessage;
 }
@@ -15,7 +17,7 @@ export function MessageBubble({ message }: Readonly<MessageBubbleProps>) {
     const attachments = message.attachments ?? [];
 
     const renderAttachment = (attachment: ChatAttachment, index: number) => {
-        const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(attachment.mime_type);
+        const isImage = IMAGE_MIME_TYPES.includes(attachment.mime_type);
         const href = attachment.id ? `/api/attachments/${attachment.id}` : undefined;
 
         if (isImage && href) {

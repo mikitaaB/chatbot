@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, KeyboardEvent, ClipboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Paperclip, Send } from 'lucide-react';
@@ -36,7 +36,7 @@ export function ChatInput({ onSend, disabled, placeholder }: Readonly<ChatInputP
         setAttachments([]);
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -66,7 +66,7 @@ export function ChatInput({ onSend, disabled, placeholder }: Readonly<ChatInputP
         setAttachments(prev => prev.filter(a => a.key !== key));
     };
 
-    const handlePaste = async (e: React.ClipboardEvent) => {
+    const handlePaste = async (e: ClipboardEvent) => {
         const items = Array.from(e.clipboardData.items);
         const files = items
             .filter(item => item.kind === 'file')

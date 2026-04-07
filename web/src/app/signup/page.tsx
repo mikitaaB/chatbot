@@ -14,14 +14,6 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    const getErrorMessage = (error: unknown) => {
-        if (error instanceof Error) {
-            return error.message;
-        }
-
-        return 'Failed to sign up';
-    };
-
     const handleSubmit = async (e: SubmitEvent) => {
         e.preventDefault();
         if (password !== confirmPassword) {
@@ -46,7 +38,8 @@ export default function SignupPage() {
 
             router.push('/login');
         } catch (error: unknown) {
-            setError(getErrorMessage(error));
+            const errMssage = error instanceof Error ? error.message : 'Failed to sign up';
+            setError(errMssage);
         } finally {
             setLoading(false);
         }
@@ -56,7 +49,7 @@ export default function SignupPage() {
         <div className="flex items-center justify-center min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4">
             <div className="w-full max-w-md space-y-8 bg-white dark:bg-zinc-900 p-8 rounded-xl border shadow-sm">
                 <div className="text-center">
-                    <h2 className="text-2xl font-bold">Create an account</h2>
+                    <h2 className="text-xl font-bold">Create an account</h2>
                     <p className="text-sm text-muted-foreground mt-2">
                         Sign up to save your chat history and more
                     </p>
