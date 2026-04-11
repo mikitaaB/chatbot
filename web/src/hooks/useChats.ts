@@ -12,12 +12,14 @@ export function useChats() {
     const { user, accessToken, guest } = useAuth();
     const queryClient = useQueryClient();
 
+    const queryKey = ['chats', user?.id, guest?.remainingQuota];
+
     const {
         data: chats,
         isLoading,
         error,
     } = useQuery<ChatListItem[]>({
-        queryKey: ['chats', user?.id, guest?.remainingQuota],
+        queryKey,
         queryFn: async () => {
             const headers: HeadersInit = {};
             if (accessToken) {
@@ -34,12 +36,11 @@ export function useChats() {
     });
 
     useEffect(() => {
-        if (!user) return;
+        if (!user?.id) return;
 
         const supabase = getSupabaseBrowserClient();
-        const channelId = `chats-realtime-${Math.random().toString(36).slice(2, 9)}`;
         const channel = supabase
-            .channel(channelId)
+            .channel(`chats-${user.id}`)
             .on(
                 'postgres_changes',
                 {
@@ -57,7 +58,7 @@ export function useChats() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user, queryClient]);
+    }, [user?.id]);
 
     const createChat = useMutation<ChatListItem, Error, string | undefined>({
         mutationFn: async (title?: string) => {
@@ -72,8 +73,11 @@ export function useChats() {
             if (!res.ok) throw new Error('Failed to create chat');
             return (await res.json()) as ChatListItem;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['chats'] });
+        onSuccess: (newChat) => {
+            queryClient.setQueryData<ChatListItem[]>(queryKey, (prev) => {
+                if (!prev) return [newChat];
+                return [newChat, ...prev];
+            });
         },
     });
 
@@ -88,8 +92,11 @@ export function useChats() {
             });
             if (!res.ok) throw new Error('Failed to delete chat');
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['chats'] });
+        onSuccess: (_, chatId) => {
+            queryClient.setQueryData<ChatListItem[]>(queryKey, (prev) => {
+                if (!prev) return prev;
+                return prev.filter((c) => c.id !== chatId);
+            });
         },
     });
 

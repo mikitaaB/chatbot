@@ -8,17 +8,24 @@ export default function HomePage() {
     const { chats, isLoading, createChat } = useChats();
     const router = useRouter();
     const hasCreated = useRef(false);
+    const redirected = useRef(false);
 
     useEffect(() => {
+        if (redirected.current) return;
+
         if (chats && chats.length > 0) {
+            redirected.current = true;
             router.replace(`/chat/${chats[0].id}`);
             return;
         }
 
-        if (!isLoading && chats?.length === 0 && !hasCreated.current && !createChat.isPending) {
+        if (!isLoading && chats?.length === 0) {
+            if (hasCreated.current) return;
+
             hasCreated.current = true;
             createChat.mutate(undefined, {
                 onSuccess: (chat) => {
+                    redirected.current = true;
                     router.replace(`/chat/${chat.id}`);
                 },
                 onError: () => {
@@ -26,7 +33,7 @@ export default function HomePage() {
                 },
             });
         }
-    }, [chats, isLoading, createChat, router]);
+    }, [chats, isLoading]);
 
     return (
         <div className="flex items-center justify-center h-screen">
