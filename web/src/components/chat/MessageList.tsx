@@ -17,7 +17,9 @@ export function MessageList({ messages, isLoading, streamingMessage, isStreaming
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollRef.current?.scrollIntoView({
+            behavior: 'smooth',
+        });
     }, [messages, streamingMessage]);
 
     if (isLoading && messages?.length === 0) {
@@ -39,14 +41,17 @@ export function MessageList({ messages, isLoading, streamingMessage, isStreaming
                 )}
 
                 {messages?.map((msg) => (
-                    <MessageBubble key={msg.id} message={msg} />
+                    <MessageBubble
+                        key={msg.id}
+                        message={msg}
+                    />
                 ))}
 
-                {isStreaming && (
+                {isStreaming && !streamingMessage && (
                     <MessageBubble
                         message={{
                             role: 'ASSISTANT',
-                            content: streamingMessage,
+                            content: '',
                             isStreaming: true,
                         }}
                     />

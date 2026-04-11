@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useChatMessages, type ChatAttachment, type ChatMessage } from '@/hooks/useChatMessages';
+import { useChatMessages, type ChatAttachment, type ChatMessage} from '@/hooks/useChatMessages';
 import { useChatStream } from '@/hooks/useChatStream';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
@@ -13,31 +13,32 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 
 export function ChatInterface() {
-    const { id: chatId } = useParams();
+    const { id: chatId } = useParams<{ id: string }>();
     const { guest } = useAuth();
     const queryClient = useQueryClient();
-    const { messages: serverMessages, isLoading, isError } = useChatMessages(chatId as string);
-    const { sendMessage, streamingMessage, isStreaming, error } = useChatStream(chatId as string);
+    const { messages: serverMessages, isLoading, isError } = useChatMessages(chatId);
+    const { sendMessage, streamingMessage, isStreaming, error } = useChatStream(chatId);
     const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
 
     const router = useRouter();
 
-    const allMessages = useMemo<ChatMessage[]>(() => {
-        const server: ChatMessage[] = serverMessages ?? [];
-
-        const sortedServer = [...server].sort((a, b) => {
-            return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
+    const allMessages = useMemo(() => {
+        const sortedServer = (serverMessages ?? []).sort((a, b) => {
+            return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
         });
 
-        const optimistic = optimisticMessages.filter((optimisticMessage) => {
-            return !sortedServer.some((serverMessage) => serverMessage.id === optimisticMessage.id);
+        const optimistic = optimisticMessages.filter(optimisticMsg => {
+            return !sortedServer.some(serverMsg => serverMsg.id === optimisticMsg.id)
         });
 
         return sortedServer.concat(optimistic);
     }, [serverMessages, optimisticMessages]);
 
-    const handleSendMessage = async (content: string, pendingUploads?: PendingUpload[]) => {
-        const userMsgId = Math.random().toString(36).substring(7);
+    const handleSendMessage = async (
+        content: string,
+        pendingUploads?: PendingUpload[]
+    ) => {
+        const userMsgId = crypto.randomUUID();
         const attachments: ChatAttachment[] | undefined = pendingUploads?.map((pendingUpload) => ({
             file_name: pendingUpload.fileName,
             mime_type: pendingUpload.mimeType,
@@ -54,11 +55,12 @@ export function ChatInterface() {
 
         try {
             await sendMessage(content, pendingUploads);
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ['messages', chatId] }),
-                queryClient.invalidateQueries({ queryKey: ['chats'] }),
-            ]);
-            setOptimisticMessages([]);
+            setOptimisticMessages((p) =>
+                p.filter((m) => m.id !== userMsgId)
+            );
+            queryClient.invalidateQueries({
+                queryKey: ['messages', chatId],
+            });
         } catch (err: unknown) {
             const errMessage = err instanceof Error ? err.message : 'Failed to send message';
             console.error('Failed to send message:', errMessage);

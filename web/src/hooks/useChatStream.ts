@@ -11,40 +11,52 @@ export function useChatStream(chatId: string) {
     const sendMessage = async (content: string, pendingUploads?: PendingUpload[]) => {
         setIsStreaming(true);
         setStreamingMessage('');
+        setError(null);
 
-        const headers: HeadersInit = { 'Content-Type': 'application/json' };
-        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+        };
+
+        if (accessToken) {
+            headers.Authorization = `Bearer ${accessToken}`;
+        }
 
         try {
             const response = await fetch(`/api/chats/${chatId}/messages`, {
                 method: 'POST',
                 credentials: 'include',
-                body: JSON.stringify({ content, pendingUploads }),
+                body: JSON.stringify({
+                    content,
+                    pendingUploads,
+                }),
                 headers,
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                if (response.status === 503 || response.status === 429) {
-                    throw new Error("AI service is busy. Please try again in a moment.");
-                }
-                throw new Error(errorText || 'Failed to send message');
+            if (!response.body) {
+                throw new Error('Failed to send message');
             }
 
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
 
-            while (reader) {
-                const { done, value } = await reader.read();
+            let result = '';
+            while (true) {
+                const { value, done } =
+                    await reader.read();
                 if (done) break;
-                const chunk = decoder.decode(value);
-                setStreamingMessage(prev => prev + chunk);
+                const text = decoder.decode(value, {
+                    stream: true,
+                });
+                if (!text) continue;
+                result += text;
+                setStreamingMessage(result);
             }
 
+            setIsStreaming(false);
             await refreshAuth();
         } catch (err: unknown) {
             const errMessage = err instanceof Error ? err.message : "An unknown error occurred";
-            setError(errMessage );
+            setError(errMessage);
         } finally {
             setIsStreaming(false);
         }
