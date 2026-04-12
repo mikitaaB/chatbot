@@ -17,6 +17,12 @@ type MessageWithAttachments = {
     content: string | null;
 };
 
+type NewMessage = {
+    chat_id: string;
+    role: 'USER';
+    content: string | null;
+};
+
 const supportedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const supportedDocumentTypes = new Set([
     'application/pdf',
@@ -150,7 +156,7 @@ export async function POST(
         return new Response('Content or attachments required', { status: 400 });
     }
 
-    const messageData: any = {
+    const messageData: NewMessage = {
         chat_id: chatId,
         role: 'USER',
         content: content || null,
