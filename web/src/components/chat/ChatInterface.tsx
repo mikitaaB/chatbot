@@ -17,10 +17,11 @@ export function ChatInterface() {
     const { guest } = useAuth();
     const queryClient = useQueryClient();
     const { messages: serverMessages, isLoading, isError } = useChatMessages(chatId);
-    const { sendMessage, streamingMessage, isStreaming, error } = useChatStream(chatId);
+    const { sendMessage, streamingMessage, isStreaming, error: streamError } = useChatStream(chatId);
     const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
 
     const router = useRouter();
+    const isQuotaExhausted = !!guest && guest.remainingQuota === 0;
 
     const allMessages = useMemo(() => {
         const sortedServer = (serverMessages ?? []).sort((a, b) => {
@@ -87,12 +88,12 @@ export function ChatInterface() {
                 </Button>}
             </header>
 
-            {guest?.remainingQuota === 0 && <GuestQuotaAlert />}
+            {isQuotaExhausted && <GuestQuotaAlert />}
 
             <div className="flex-1 overflow-y-auto">
-                {error && (
+                {streamError && (
                     <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 p-3 rounded-md text-sm mx-4 mb-2">
-                        {error}
+                        {streamError}
                     </div>
                 )}
                 <MessageList
@@ -105,9 +106,9 @@ export function ChatInterface() {
 
             <ChatInput
                 onSend={handleSendMessage}
-                disabled={isStreaming || (!!guest && guest.remainingQuota === 0)}
+                disabled={isStreaming || isQuotaExhausted}
                 placeholder={
-                    guest?.remainingQuota === 0
+                    isQuotaExhausted
                         ? 'Free questions limit reached. Please sign in.'
                         : 'Send a message...'
                 }

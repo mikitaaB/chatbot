@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
-interface User {
+export interface User {
     id: string;
     email?: string;
 }

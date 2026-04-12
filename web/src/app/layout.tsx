@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import { Providers } from './providers';
-import { ChatSidebar } from '@/components/chat/ChatSidebar';
+import { ChatSidebar } from '@/components/sidebar/ChatSidebar';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });

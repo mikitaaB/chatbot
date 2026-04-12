@@ -10,12 +10,19 @@ interface AttachmentPreviewProps {
 }
 
 export function AttachmentPreview({ name, type, onRemove }: Readonly<AttachmentPreviewProps>) {
-    const isImage = type.startsWith('image/');
+    const isImage = type.startsWith('image/') ?? false;
+
     return (
         <div className="flex items-center gap-2 bg-muted rounded-md px-2 py-1 text-sm">
             {isImage ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
             <span className="max-w-[150px] truncate">{name}</span>
-            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onRemove}>
+            <Button
+                className="h-5 w-5"
+                variant="ghost"
+                size="icon"
+                onClick={onRemove}
+                aria-label={`Remove attachment ${name}`}
+            >
                 <X className="h-3 w-3" />
             </Button>
         </div>
