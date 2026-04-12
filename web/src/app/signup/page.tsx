@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SignupPage() {
     const [email, setEmail] = useState('');
@@ -12,6 +13,8 @@ export default function SignupPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const { signUp } = useAuth();
     const router = useRouter();
 
     const handleSubmit = async (e: SubmitEvent) => {
@@ -25,17 +28,7 @@ export default function SignupPage() {
         setError('');
 
         try {
-            const res = await fetch('/api/auth/signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Failed to sign up');
-            }
-
+            await signUp(email, password);
             router.push('/login');
         } catch (error: unknown) {
             const errMssage = error instanceof Error ? error.message : 'Failed to sign up';

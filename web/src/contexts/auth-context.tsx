@@ -17,7 +17,7 @@ export interface User {
     email?: string;
 }
 
-interface Guest {
+export interface Guest {
     remainingQuota: number;
 }
 
@@ -40,6 +40,7 @@ interface AuthContextValue {
     guest: Guest | null;
     loading: boolean;
     signIn: (email: string, password: string) => Promise<{ id?: string; email?: string } | undefined>;
+    signUp: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     refreshAuth: () => Promise<void>;
 }
@@ -109,24 +110,60 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
         };
     }, [syncFromServer]);
 
-    const signIn = useCallback(
-        async (email: string, password: string) => {
-            const res = await fetch('/api/auth/signin', {
-                method: 'POST',
-                credentials: 'include',
-                body: JSON.stringify({ email, password }),
-                headers: { 'Content-Type': 'application/json' },
-            });
-            const { access_token, user: userData } = await res.json();
-            if (access_token) {
-                const supabase = createClient();
-                await supabase.auth.setSession({ access_token, refresh_token: '' });
-                await syncFromServer();
+    const signIn = useCallback(async (email: string, password: string) => {
+        const res = await fetch('/api/auth/signin', {
+            method: 'POST',
+            credentials: 'include',
+            body: JSON.stringify({ email, password }),
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+            let message = 'Failed to sign in';
+
+            const contentType = res.headers.get('content-type');
+
+            if (contentType?.includes('application/json')) {
+                const err = await res.json();
+                message = err?.error ?? message;
+            } else {
+                const text = await res.text();
+                if (text) message = text;
             }
-            return userData;
-        },
-        [syncFromServer],
-    );
+
+            throw new Error(message);
+        }
+        const { access_token, user: userData } = await res.json();
+        if (access_token) {
+            const supabase = createClient();
+            await supabase.auth.setSession({ access_token, refresh_token: '' });
+            await syncFromServer();
+        }
+        return userData;
+    }, [syncFromServer],);
+
+    const signUp = useCallback(async (email: string, password: string) => {
+        const res = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+
+        if (!res.ok) {
+            let message = 'Failed to sign up';
+
+            const contentType = res.headers.get('content-type');
+
+            if (contentType?.includes('application/json')) {
+                const data = await res.json();
+                message = data?.error ?? message;
+            } else {
+                const text = await res.text();
+                if (text) message = text;
+            }
+
+            throw new Error(message);
+        }
+    }, []);
 
     const signOut = useCallback(async () => {
         const supabase = createClient();
@@ -136,8 +173,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     }, [syncFromServer]);
 
     const value = useMemo(
-        () => ({ user, accessToken, guest, loading, signIn, signOut, refreshAuth: syncFromServer }),
-        [user, accessToken, guest, loading, signIn, signOut, syncFromServer],
+        () => ({ user, accessToken, guest, loading, signIn, signUp, signOut, refreshAuth: syncFromServer }),
+        [user, accessToken, guest, loading, signIn, signUp, signOut, syncFromServer],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

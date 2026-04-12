@@ -5,6 +5,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageBubble } from './MessageBubble';
 import { Loader2 } from 'lucide-react';
 import type { ChatMessage } from '@/hooks/useChatMessages';
+import { StreamingMessage } from './StreamingMessage';
+import { EmptyState } from './EmptyState';
 
 interface MessageListProps {
     messages: ChatMessage[];
@@ -33,12 +35,7 @@ export function MessageList({ messages, isLoading, streamingMessage, isStreaming
     return (
         <ScrollArea className="flex-1 p-4">
             <div className="max-w-3xl mx-auto space-y-4">
-                {messages?.length === 0 && !streamingMessage && (
-                    <div className="text-center py-12 text-muted-foreground">
-                        <p className="text-lg">Welcome to Chat</p>
-                        <p className="text-sm">Send a message to start the conversation.</p>
-                    </div>
-                )}
+                {messages?.length === 0 && !streamingMessage && <EmptyState />}
 
                 {messages?.map((msg) => (
                     <MessageBubble
@@ -47,15 +44,7 @@ export function MessageList({ messages, isLoading, streamingMessage, isStreaming
                     />
                 ))}
 
-                {isStreaming && !streamingMessage && (
-                    <MessageBubble
-                        message={{
-                            role: 'ASSISTANT',
-                            content: '',
-                            isStreaming: true,
-                        }}
-                    />
-                )}
+                {isStreaming && !streamingMessage && <StreamingMessage />}
 
                 <div ref={scrollRef} />
             </div>

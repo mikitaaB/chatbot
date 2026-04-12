@@ -74,20 +74,17 @@ export async function GET(
         return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
 
-    let messagesQuery;
-    if (auth.type === 'authenticated') {
-        messagesQuery = supabase
+    const messagesQuery = auth.type === 'authenticated'
+        ? supabase
+            .from('messages')
+            .select(`*, attachments (*)`)
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: true })
+        : supabaseAdmin
             .from('messages')
             .select(`*, attachments (*)`)
             .eq('chat_id', chatId)
             .order('created_at', { ascending: true });
-    } else {
-        messagesQuery = supabaseAdmin
-            .from('messages')
-            .select(`*, attachments (*)`)
-            .eq('chat_id', chatId)
-            .order('created_at', { ascending: true });
-    }
 
     const { data: messages, error } = await messagesQuery;
     if (error) {

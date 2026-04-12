@@ -1,11 +1,23 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, KeyboardEvent, ClipboardEvent } from 'react';
+import { useState, useRef, ChangeEvent, KeyboardEvent, ClipboardEvent, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Paperclip, Send } from 'lucide-react';
 import { AttachmentPreview } from './AttachmentPreview';
 import { uploadFile, type PendingUpload } from '@/lib/upload';
+
+const ACCEPTED_FILE_TYPES = [
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'application/pdf',
+    'text/plain',
+    'text/markdown',
+    'application/json',
+    '.md',
+    '.docx',
+].join(',');
 
 interface ChatInputProps {
     onSend: (content: string, pendingUploads?: PendingUpload[]) => void;
@@ -19,76 +31,88 @@ export function ChatInput({ onSend, disabled, placeholder }: Readonly<ChatInputP
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleSend = () => {
-        if ((!message.trim() && attachments.length === 0) || disabled) return;
+    const canSend = !disabled && (message.trim().length > 0 || attachments.length > 0) && !isUploading;
+
+    const addAttachment = useCallback((uploaded: PendingUpload) => {
+        setAttachments((prev) => [
+            ...prev,
+            { ...uploaded, key: uploaded.storagePath },
+        ]);
+    }, []);
+
+    const uploadFiles = useCallback(async (files: File[]) => {
+        if (files.length === 0) return;
+
+        setIsUploading(true);
+        try {
+            for (const file of files) {
+                try {
+                    const uploaded = await uploadFile(file);
+                    addAttachment(uploaded);
+                } catch (err) {
+                    console.error('Upload failed', err);
+                }
+            }
+        } finally {
+            setIsUploading(false);
+        }
+    }, [addAttachment]);
+
+    const handleSend = useCallback(() => {
+        if (!canSend) return;
+
         onSend(
             message,
             attachments.length > 0
-                ? attachments.map((attachment) => ({
-                    storagePath: attachment.storagePath,
-                    fileName: attachment.fileName,
-                    fileSize: attachment.fileSize,
-                    mimeType: attachment.mimeType,
+                ? attachments.map(({ storagePath, fileName, fileSize, mimeType }) => ({
+                    storagePath,
+                    fileName,
+                    fileSize,
+                    mimeType,
                 }))
                 : undefined,
         );
+
         setMessage('');
         setAttachments([]);
-    };
+    }, [canSend, message, attachments, onSend]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
         }
-    };
+    }, [handleSend]);
 
-    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        if (files.length === 0) return;
-        setIsUploading(true);
-        for (const file of files) {
-            try {
-                const uploaded = await uploadFile(file);
-                setAttachments(prev => [
-                    ...prev,
-                    { ...uploaded, key: uploaded.storagePath },
-                ]);
-            } catch (err) {
-                console.error('Upload failed', err);
+        await uploadFiles(files);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }, [uploadFiles]);
+
+    const handlePaste = useCallback(async (e: ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        const files: File[] = [];
+
+        for (const element of items) {
+            const item = element;
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) files.push(file);
             }
         }
-        setIsUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
 
-    const removeAttachment = (key: string) => {
-        setAttachments(prev => prev.filter(a => a.key !== key));
-    };
-
-    const handlePaste = async (e: ClipboardEvent) => {
-        const items = Array.from(e.clipboardData.items);
-        const files = items
-            .filter(item => item.kind === 'file')
-            .map(item => item.getAsFile())
-            .filter((file): file is File => file !== null);
-
-        if (files.length === 0) return;
-
-        setIsUploading(true);
-        for (const file of files) {
-            try {
-                const uploaded = await uploadFile(file);
-                setAttachments(prev => [
-                    ...prev,
-                    { ...uploaded, key: uploaded.storagePath },
-                ]);
-            } catch (err) {
-                console.error('Paste upload failed', err);
-            }
+        if (files.length > 0) {
+            await uploadFiles(files);
         }
-        setIsUploading(false);
-    };
+    }, [uploadFiles]);
+
+    const removeAttachment = useCallback((key: string) => {
+        setAttachments((prev) => prev.filter((a) => a.key !== key));
+    }, []);
 
     return (
         <div className="border-t p-4 bg-background">
@@ -122,7 +146,7 @@ export function ChatInput({ onSend, disabled, placeholder }: Readonly<ChatInputP
                             ref={fileInputRef}
                             onChange={handleFileChange}
                             multiple
-                            accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,text/markdown,application/json,.md,.docx"
+                            accept={ACCEPTED_FILE_TYPES}
                             className="hidden"
                         />
                         <Button
@@ -138,7 +162,7 @@ export function ChatInput({ onSend, disabled, placeholder }: Readonly<ChatInputP
                     </div>
                     <Button
                         onClick={handleSend}
-                        disabled={disabled || (!message.trim() && attachments.length === 0) || isUploading}
+                        disabled={!canSend}
                         size="icon"
                         className="h-[80px] w-[80px]"
                     >

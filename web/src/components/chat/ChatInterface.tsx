@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useChatMessages, type ChatAttachment, type ChatMessage} from '@/hooks/useChatMessages';
+import { useParams } from 'next/navigation';
+import { useChatMessages, type ChatAttachment, type ChatMessage } from '@/hooks/useChatMessages';
 import { useChatStream } from '@/hooks/useChatStream';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
@@ -10,7 +10,7 @@ import { GuestQuotaAlert } from './GuestQuotaAlert';
 import { useAuth } from '@/hooks/useAuth';
 import type { PendingUpload } from '@/lib/upload';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '../ui/button';
+import { ChatHeader } from './ChatHeader';
 
 export function ChatInterface() {
     const { id: chatId } = useParams<{ id: string }>();
@@ -20,7 +20,6 @@ export function ChatInterface() {
     const { sendMessage, streamingMessage, isStreaming, error: streamError } = useChatStream(chatId);
     const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
 
-    const router = useRouter();
     const isQuotaExhausted = !!guest && guest.remainingQuota === 0;
 
     const allMessages = useMemo(() => {
@@ -81,12 +80,7 @@ export function ChatInterface() {
 
     return (
         <div className="flex flex-col h-screen bg-white dark:bg-zinc-950">
-            <header className="border-b px-6 py-3 flex items-center justify-between">
-                <h1 className="text-lg font-semibold">Chat</h1>
-                {guest && <Button size="sm" variant="outline" onClick={() => router.push('/login')}>
-                    Sign in
-                </Button>}
-            </header>
+            <ChatHeader guest={guest} />
 
             {isQuotaExhausted && <GuestQuotaAlert />}
 
