@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helper';
-import { prisma } from '@/lib/prisma';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createGeminiStream, type GeminiPart } from '@/lib/gemini-stream';
 import { extractTextFromFile } from '@/lib/file-extractors';
+import { createClient } from '@/utils/supabase/server';
+import { supabaseAdmin } from '@/utils/supabase/service';
 
 type PendingUpload = {
     storagePath: string;
@@ -33,21 +33,60 @@ export async function GET(
 ) {
     const auth = await getUserFromRequest(req);
     const { id: chatId } = await params;
+    const supabase = await createClient();
+    let chat = null;
 
-    const where =
-        auth.type === 'authenticated'
-            ? { id: chatId, user_id: auth.userId }
-            : { id: chatId, guest_token_hash: auth.guestId };
-    const chat = await prisma.chat.findFirst({ where });
+    if (auth.type === 'authenticated') {
+        const { data } = await supabase
+            .from('chats')
+            .select('id')
+            .eq('id', chatId)
+            .eq('user_id', auth.userId)
+            .maybeSingle();
+        chat = data;
+    } else {
+        const { data: guestSession } = await supabaseAdmin
+            .from('guest_sessions')
+            .select('id')
+            .eq('guest_token_hash', auth.guestId)
+            .maybeSingle();
+
+        if (!guestSession) {
+            return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+        }
+
+        const { data } = await supabaseAdmin
+            .from('chats')
+            .select('id')
+            .eq('id', chatId)
+            .eq('guest_session_id', guestSession.id)
+            .maybeSingle();
+        chat = data;
+    }
+
     if (!chat) {
         return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
 
-    const messages = await prisma.message.findMany({
-        where: { chat_id: chatId },
-        orderBy: { created_at: 'asc' },
-        include: { attachments: true },
-    });
+    let messagesQuery;
+    if (auth.type === 'authenticated') {
+        messagesQuery = supabase
+            .from('messages')
+            .select(`*, attachments (*)`)
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: true });
+    } else {
+        messagesQuery = supabaseAdmin
+            .from('messages')
+            .select(`*, attachments (*)`)
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: true });
+    }
+
+    const { data: messages, error } = await messagesQuery;
+    if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ messages });
 }
@@ -58,18 +97,47 @@ export async function POST(
 ) {
     const auth = await getUserFromRequest(req);
     const { id: chatId } = await params;
+    const supabase = await createClient();
 
-    const whereChat =
-        auth.type === 'authenticated'
-            ? { id: chatId, user_id: auth.userId }
-            : { id: chatId, guest_token_hash: auth.guestId };
-    const chat = await prisma.chat.findFirst({ where: whereChat });
-    if (!chat) {
-        return new Response('Chat not found', { status: 404 });
+    let dbClient;
+    let guestSession = null;
+
+    if (auth.type === 'authenticated') {
+        dbClient = supabase;
+    } else {
+        dbClient = supabaseAdmin;
+
+        const { data: session, error: guestError } = await supabaseAdmin
+            .from('guest_sessions')
+            .select('id, remaining_quota')
+            .eq('guest_token_hash', auth.guestId)
+            .maybeSingle();
+
+        if (guestError || !session) {
+            return new Response('Chat not found', { status: 404 });
+        }
+        guestSession = session;
+
+        if (guestSession.remaining_quota <= 0) {
+            return new Response('Guest quota exceeded. Please sign up.', { status: 403 });
+        }
     }
 
-    if (auth.type === 'guest' && auth.remainingQuota <= 0) {
-        return new Response('Guest quota exceeded. Please sign up.', { status: 403 });
+    let chatQuery = dbClient
+        .from('chats')
+        .select('id')
+        .eq('id', chatId);
+
+    if (auth.type === 'authenticated') {
+        chatQuery = chatQuery.eq('user_id', auth.userId);
+    } else {
+        chatQuery = chatQuery.eq('guest_session_id', guestSession!.id);
+    }
+
+    const { data: chat, error: chatError } = await chatQuery.maybeSingle();
+
+    if (!chat || chatError) {
+        return new Response('Chat not found', { status: 404 });
     }
 
     const body = (await req.json()) as {
@@ -82,38 +150,74 @@ export async function POST(
         return new Response('Content or attachments required', { status: 400 });
     }
 
-    const userMessage = await prisma.message.create({
-        data: {
-            chat_id: chatId,
-            role: 'USER',
-            content: content || null,
-            attachments:
-                pendingUploads && pendingUploads.length > 0
-                    ? {
-                        create: pendingUploads.map(p => ({
-                            storage_path: p.storagePath,
-                            file_name: p.fileName,
-                            file_size: p.fileSize,
-                            mime_type: p.mimeType,
-                        })),
-                    }
-                    : undefined,
-        },
-        include: { attachments: true },
-    });
+    const messageData: any = {
+        chat_id: chatId,
+        role: 'USER',
+        content: content || null,
+    };
 
-    const history = await prisma.message.findMany({
-        where: { chat_id: chatId },
-        orderBy: { created_at: 'asc' },
-        take: 20,
-        include: { attachments: true },
-    });
+    const { data: userMessage, error: msgError } = await dbClient
+        .from('messages')
+        .insert(messageData)
+        .select(`
+            *,
+            attachments (*)
+        `)
+        .single();
+
+    if (msgError || !userMessage) {
+        console.error('Failed to create message:', msgError);
+        return new Response('Failed to create message', { status: 500 });
+    }
+
+    if (pendingUploads && pendingUploads.length > 0) {
+        const attachmentsData = pendingUploads.map(p => ({
+            message_id: userMessage.id,
+            storage_path: p.storagePath,
+            file_name: p.fileName,
+            file_size: p.fileSize,
+            mime_type: p.mimeType,
+        }));
+
+        const { error: attError } = await dbClient
+            .from('attachments')
+            .insert(attachmentsData);
+
+        if (attError) {
+            console.error('Failed to create attachments:', attError);
+            await dbClient.from('messages').delete().eq('id', userMessage.id);
+            return new Response('Failed to save attachments', { status: 500 });
+        }
+        const { data: refreshed } = await dbClient
+            .from('messages')
+            .select(`*, attachments (*)`)
+            .eq('id', userMessage.id)
+            .single();
+
+        if (refreshed) {
+            Object.assign(userMessage, refreshed);
+        }
+    }
+
+    const { data: history, error: histError } = await dbClient
+        .from('messages')
+        .select(`
+            *,
+            attachments (*)
+        `)
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: true })
+        .limit(20);
+
+    if (histError) {
+        console.error('Failed to fetch history:', histError);
+    }
 
     let docsContext = '';
     const promptParts: GeminiPart[] = [];
 
-    for (const att of userMessage.attachments) {
-        const { data: fileData, error } = await supabaseAdmin.storage
+    for (const att of userMessage.attachments || []) {
+        const { data: fileData, error } = await dbClient.storage
             .from('attachments')
             .download(att.storage_path);
         if (!error && fileData) {
@@ -133,10 +237,12 @@ export async function POST(
                     docsContext += `\n[Document: ${att.file_name}]\n${text}\n`;
                 }
             }
+        } else {
+            console.error('Failed to download file:', att.storage_path, error);
         }
     }
 
-    const formattedHistory = history
+    const formattedHistory = (history || [])
         .map((message: MessageWithAttachments) => `${message.role}: ${message.content ?? ''}`)
         .join('\n');
 
@@ -180,25 +286,26 @@ Assistant:`;
         },
 
         async flush() {
-            await prisma.message.create({
-                data: {
+            const { error: assistantError } = await dbClient
+                .from('messages')
+                .insert({
                     chat_id: chatId,
                     role: 'ASSISTANT',
                     content: fullAssistantResponse,
-                },
-            });
-
-            if (auth.type === 'guest') {
-                await prisma.guestSession.update({
-                    where: { guest_token_hash: auth.guestId },
-                    data: { remaining_quota: { decrement: 1 } },
                 });
+
+            if (assistantError) {
+                console.error('Failed to save assistant message:', assistantError);
             }
 
-            await prisma.chat.update({
-                where: { id: chatId },
-                data: { updated_at: new Date() },
-            });
+            const { error: chatUpdateError } = await dbClient
+                .from('chats')
+                .update({ updated_at: new Date().toISOString() })
+                .eq('id', chatId);
+
+            if (chatUpdateError) {
+                console.error('Failed to update chat timestamp:', chatUpdateError);
+            }
         },
     });
 

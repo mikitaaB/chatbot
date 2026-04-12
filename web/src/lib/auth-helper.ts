@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { supabaseAdmin } from './supabase-admin';
 import { hashGuestToken, getOrCreateGuestSession } from './guest-token';
-import { prisma } from './prisma';
+import { createClient } from '@/utils/supabase/server';
+import { supabaseAdmin } from '@/utils/supabase/service';
 
 export type AuthUser = {
     type: 'authenticated';
@@ -22,7 +22,8 @@ export async function getUserFromRequest(req: NextRequest): Promise<AuthResult> 
     const authHeader = req.headers.get('authorization');
     if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.slice(7);
-        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        const supabase = await createClient();
+        const { data: { user }, error } = await supabase.auth.getUser(token);
         if (!error && user) {
             return {
                 type: 'authenticated',
@@ -35,8 +36,13 @@ export async function getUserFromRequest(req: NextRequest): Promise<AuthResult> 
     const guestToken = req.cookies.get('guest_token')?.value;
     if (guestToken) {
         const hash = hashGuestToken(guestToken);
-        const session = await prisma.guestSession.findUnique({ where: { guest_token_hash: hash } });
-        if (session) {
+        const { data: session, error } = await supabaseAdmin
+            .from('guest_sessions')
+            .select('*')
+            .eq('guest_token_hash', hash)
+            .maybeSingle();
+
+        if (session && !error) {
             return {
                 type: 'guest',
                 guestId: hash,
@@ -46,7 +52,7 @@ export async function getUserFromRequest(req: NextRequest): Promise<AuthResult> 
         }
     }
 
-    const { session, token } = await getOrCreateGuestSession();
+    const { session, token } = await getOrCreateGuestSession(guestToken);
     return {
         type: 'guest',
         guestId: session.guest_token_hash,

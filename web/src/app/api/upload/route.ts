@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helper';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createClient } from '@/utils/supabase/server';
 
 const allowedMimeTypes = new Set([
     'application/pdf',
@@ -16,6 +16,7 @@ const allowedMimeTypes = new Set([
 
 export async function POST(req: NextRequest) {
     const auth = await getUserFromRequest(req);
+    const supabase = await createClient();
     const formData = await req.formData();
     const file = formData.get('file') as File;
     if (!file) {
@@ -26,10 +27,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
     }
 
-    const ownerId = auth.type === 'authenticated' ? `user_${auth.userId}` : `guest_${auth.guestId}`;
-    const filePath = `${ownerId}/${Date.now()}_${file.name.replaceAll(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const filePath = auth.type === 'authenticated'
+        ? `${auth.userId}/${Date.now()}_${file.name.replaceAll(/[^a-zA-Z0-9._-]/g, '_')}`
+        : `guest/${auth.guestId}/${Date.now()}_${file.name.replaceAll(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-    const { error: uploadError } = await supabaseAdmin.storage
+    const { error: uploadError } = await supabase.storage
         .from('attachments')
         .upload(filePath, file, { contentType: file.type });
     if (uploadError) {

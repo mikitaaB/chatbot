@@ -35,18 +35,12 @@ Create `.env.local` according to `.env.example` in the `web` directory.
     supabase start
 ```
 
-4. Generate Prisma Client
+4. Run database migration
 ```bash
-    cd web
-    npx prisma generate
+    supabase migration up
 ```
 
-5. Run database migration
-```bash
-    npm run db:deploy
-```
-
-6. Run the app in the `web` directory.
+5. Run the app in the `web` directory.
 ```bash
     npm run dev
 ```
@@ -57,8 +51,6 @@ The app is available on http://localhost:3000/
 ## Environment variables
 **NEXT_PUBLIC_SUPABASE_URL** - Your Supabase project URL \
 **GEMINI_API_KEY** - API key for Google Gemini LLM \
-**DATABASE_URL** - Postgres connection string \
-**DIRECT_URL** - Direct database connection \
 **NEXT_PUBLIC_SUPABASE_ANON_KEY** - Supabase anonymous/public key \
 **SUPABASE_SERVICE_ROLE_KEY** - Secret admin key for Supabase \
 **NODE_ENV** - Environment mode: development, production

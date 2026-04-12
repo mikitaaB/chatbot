@@ -1,6 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useAuth } from './useAuth';
 
 export type ChatListItem = {
@@ -34,31 +32,6 @@ export function useChats() {
         },
         enabled: !!user || !!guest,
     });
-
-    useEffect(() => {
-        if (!user?.id) return;
-
-        const supabase = getSupabaseBrowserClient();
-        const channel = supabase
-            .channel(`chats-${user.id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'chats',
-                    filter: `user_id=eq.${user.id}`,
-                },
-                () => {
-                    queryClient.invalidateQueries({ queryKey: ['chats'] });
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [user?.id]);
 
     const createChat = useMutation<ChatListItem, Error, string | undefined>({
         mutationFn: async (title?: string) => {

@@ -10,7 +10,7 @@ import {
     useState,
     type ReactNode,
 } from 'react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 interface User {
     id: string;
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
         pendingSync.current = (async () => {
             try {
-                const supabase = getSupabaseBrowserClient();
+                const supabase = createClient();
                 const { data } = await supabase.auth.getSession();
                 const token = data.session?.access_token ?? null;
                 setAccessToken(token);
@@ -70,6 +70,12 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
                     credentials: 'include',
                     headers: token ? { Authorization: `Bearer ${token}` } : {},
                 });
+
+                if (!res.ok) {
+                    console.error('Failed to fetch user info:', res.status);
+                    return;
+                }
+
                 const result = (await res.json()) as MeResponse;
 
                 if (result.type === 'authenticated') {
@@ -79,6 +85,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
                     setGuest({ remainingQuota: result.remainingQuota });
                     setUser(null);
                 }
+            } catch (error) {
+                console.error('Error syncing auth state:', error);
             } finally {
                 setLoading(false);
                 pendingSync.current = null;
@@ -91,7 +99,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     useEffect(() => {
         syncFromServer();
 
-        const supabase = getSupabaseBrowserClient();
+        const supabase = createClient();
         const { data: listener } = supabase.auth.onAuthStateChange(() => {
             syncFromServer();
         });
@@ -111,7 +119,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
             });
             const { access_token, user: userData } = await res.json();
             if (access_token) {
-                const supabase = getSupabaseBrowserClient();
+                const supabase = createClient();
                 await supabase.auth.setSession({ access_token, refresh_token: '' });
                 await syncFromServer();
             }
@@ -121,7 +129,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     );
 
     const signOut = useCallback(async () => {
-        const supabase = getSupabaseBrowserClient();
+        const supabase = createClient();
         await supabase.auth.signOut();
         await fetch('/api/auth/signout', { method: 'POST', credentials: 'include' });
         await syncFromServer();

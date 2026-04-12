@@ -3,13 +3,20 @@
 import { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/auth-context';
+import { useRealtimeChats } from '@/hooks/useRealtimeChats';
 
 const queryClient = new QueryClient();
+
+function RealtimeSync() {
+    useRealtimeChats();
+    return <></>;
+}
 
 export function Providers({ children }: Readonly<{ children: ReactNode }>) {
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
+                <RealtimeSync />
                 {children}
             </AuthProvider>
         </QueryClientProvider>

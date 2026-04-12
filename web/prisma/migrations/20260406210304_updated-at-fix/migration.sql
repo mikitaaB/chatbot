@@ -1,8 +1,0 @@
--- AlterTable
-ALTER TABLE "chats" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
-
--- AlterTable
-ALTER TABLE "messages" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
-
--- AlterTable
-ALTER TABLE "profiles" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
