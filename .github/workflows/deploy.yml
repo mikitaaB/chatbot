@@ -6,6 +6,7 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'web/**'
+  workflow_dispatch:
 
 jobs:
   migrate:
